@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NinjaMan</title>
+    <style type ="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .row {
+            line-height: 0;
+        }
+
+        .wall {
+            background-color: blue;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+        }
+
+        .sushi {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+            background-image: url('sushi.png');
+            background-size: contain;
+        }
+
+        .onigiri {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+            background-image: url('onigiri.png');
+            background-size: contain;
+        }
+
+        .blank {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+        }
+
+        .scorecard {
+            padding-top: 4px;
+            margin-top: 5px;
+            background-color: blue;
+            height: 25px;
+            width: 160px;
+            color: white;
+            font-size: 16px;
+            text-align: center;
+            border-style: ridge;
+            border-width: 2px;
+            border-color: black;
+            border-radius: 5px;
+        }
+
+        .gameover {
+            position: fixed;
+            color: black;
+            z-index: 100;
+            background-color: white;
+            margin-top: -370px;
+            font-size: 50px;
+            text-align: center;
+        }
+
+        .gameover-refresh{
+            position: fixed;
+            color: black;
+            z-index: 100;
+            background-color: white;
+            margin-top: -300px;
+            font-size: 23px;
+            text-align: center;
+        }
+
+        #ninjaman {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+            background-image: url('ninja.gif');
+            background-size: contain;
+            position: absolute;
+        }
+
+        #ghost {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+            background-image: url('pumpky.gif');
+            background-size: contain;
+            position: absolute;
+        }
+
+        #ghost2 {
+            background-color: black;
+            height: 40px;
+            width: 40px;
+            display: inline-block;
+            background-image: url('red.gif');
+            background-size: contain;
+            position: absolute;
+        }
+
+        #scorecard {
+            margin-top: 8px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id ='world'></div>
+        <div id ='ninjaman'></div>
+        <div id ='ghost'></div>
+        <div id ='ghost2'></div>
+        <div id ='scorecard'></div>
+        <div id ='game-over'></div>
+    </div>
+</body>
+
+<script type="text/javascript">
+    // Settings
+    var game = true;
+    
+    // Width length to determine the size of the square map
+    var dimensions = 15;
+
+    var score = 0;
+    var lives = 3;
+
+    var ninjaman = {
+        x: 0,
+        y: 0,
+    }
+    var ghost = {
+        x: 0,
+        y: 0,
+    }
+    var ghost2 = {
+        x: 0,
+        y: 0,
+    }
+    var worldDict = {
+        0: 'blank',
+        1: 'wall',
+        2: 'sushi',
+        3: 'onigiri',
+    }
+
+    // Initialize Map
+    world = generateRandomWorld(dimensions);
+    drawWorld();
+
+    // Adjust Scorecard div to Map Dimensions (Centering)
+    document.getElementById('scorecard').setAttribute("style","width:"+dimensions*40+"px");
+
+    // Place Ninjaman Randomly on the Map
+    while (world[ninjaman.y][ninjaman.x] != 3) {
+        ninjaman.x = Math.floor(Math.random() * 100 % dimensions)
+        ninjaman.y = Math.floor(Math.random() * 100 % dimensions)
+    }
+    drawNinjaman();
+    world[ninjaman.y][ninjaman.x] = 0; // If placed on a sushi or onigiri, remove it
+
+    // Count once all Sushi + Onigiris on map load and calculate Sum (Player wins if collects all)
+    var winningScore = 0;
+
+    for (var i = 0; i < dimensions; i++) {
+        for (var j = 0; j < dimensions; j++) {
+            if (world[i][j] == 2) {
+                winningScore += 10
+            }
+            if (world[i][j] == 3) {
+                winningScore += 5
+            }
+        }
+    }
+
+    // Place Ghosts Randomly on the Map
+    while (world[ghost.y][ghost.x] != 2 | ghost.x == 0) {
+        ghost.x = Math.floor(Math.random() * 100 % dimensions)
+        ghost.y = Math.floor(Math.random() * 100 % dimensions)
+    }
+    while (world[ghost2.y][ghost2.x] != 3 | ghost2.x == 0) {
+        ghost2.x = Math.floor(Math.random() * 100 % dimensions)
+        ghost2.y = Math.floor(Math.random() * 100 % dimensions)
+    }
+    drawGhosts();
+
+    // Functions
+    function generateRandomWorld(dimensions) {
+        var maxTunnels = 60, maxLength = 14;
+
+        let world = createEmptyArray(1, dimensions);
+
+        // Initialize tunnel at a random location
+        let currentRow = Math.floor(Math.random() * dimensions), currentColumn = Math.floor(Math.random() * dimensions);
+
+        // Possible directions to draw the tunnel
+        let directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        let lastDirection = [], randomDirection;
+
+        // Choose a random direction that's not the same direction or retracing back where we came from
+        while (maxTunnels > 0) {
+            do {
+                randomDirection = directions[Math.floor(Math.random() * directions.length)]
+            } while (
+                (randomDirection[0] == lastDirection[0] && randomDirection[1] == lastDirection[1]) | (randomDirection[0] == -lastDirection[0] && randomDirection[1] == -lastDirection[1])
+            )
+    
+            // Choose a random length, keeping into consideration our maxLength
+            let randomLength = 1;
+            while (randomLength == 1 | randomLength == 2) {
+                randomLength = Math.ceil(Math.random() * maxLength), tunnelLength = 0;
+            }
+            
+            // Build the tunnel in the randomly selected direction with the random length; if tunnels hits edge of map, stop building
+            while (tunnelLength < randomLength) {
+                if ( (currentRow === 0 && (randomDirection[0] === -1)) || (currentColumn === 0 && randomDirection[1] === -1) || (currentRow === dimensions-1 && randomDirection[0] ===1) || (currentColumn === dimensions-1 && randomDirection[1] === 1) )
+            { break; }
+                
+                let randomNumberForSnack = Math.ceil(Math.random() * 4)
+                if (randomNumberForSnack == 4) {
+                    world[currentRow][currentColumn] = 2;
+                } else {
+                    world[currentRow][currentColumn] = 3;
+                }
+                currentRow += randomDirection[0];
+                currentColumn += randomDirection[1];
+                tunnelLength++
+            }
+
+            lastDirection = randomDirection;
+            maxTunnels--;
+        }
+        return world
+    }
+
+    function createEmptyArray(typeOfBlock, dimensions) {
+        var array = []
+        for (var i = 0; i < dimensions; i++) {
+            var individualrow = []
+
+            for (var j = 0; j < dimensions; j++) {
+                individualrow.push(typeOfBlock)
+            }
+            array.push(individualrow)
+        }
+        return array
+    }
+
+    function drawWorld() {
+        output = "";
+
+        for (var row = 0; row < world.length; row++) {
+            output += "<div class = 'row'>"
+
+            for (var col = 0; col < world[row].length; col++) {
+                output += "<div class = '" + worldDict[world[row][col]]+"'></div>"
+            }
+            output += "</div>"
+        }
+
+        document.getElementById('world').innerHTML = output;
+    }
+
+    
+    function drawNinjaman() {
+        document.getElementById('ninjaman').style.top = ninjaman.y * 40 + 'px';
+        document.getElementById('ninjaman').style.left = ninjaman.x * 40 + 'px';
+        document.getElementById('scorecard').innerHTML = "<div class='scorecard' style='margin: auto'>Score: "+ score + " | Lives: " + lives + "</div>";
+    }
+
+    function drawGhosts() {
+        document.getElementById('ghost').style.top = ghost.y * 40 + 'px';
+        document.getElementById('ghost').style.left = ghost.x * 40 + 'px';
+        document.getElementById('ghost2').style.top = ghost2.y * 40 + 'px';
+        document.getElementById('ghost2').style.left = ghost2.x * 40 + 'px';
+    }
+
+    function ghostChaseNinjaman() {
+        // Random Chance of Doing Nothing (Adjust probabilities to adjust difficulty level)
+        let randomChanceOfDoingNothing = Math.random() * 100
+        if (randomChanceOfDoingNothing <= 45) {
+            return
+        }
+
+        // When possible, move in the y-direction toward Ninjaman, else move in the x-direction toward Ninjaman
+        if (ghost.y < ninjaman.y && world[ghost.y + 1][ghost.x] != 1) {
+            ghost.y++;
+        } else if (ghost.y > ninjaman.y && world[ghost.y - 1][ghost.x] != 1) {
+            ghost.y--;
+        } else if (ghost.x < ninjaman.x && world[ghost.y][ghost.x + 1] != 1) {
+            ghost.x++;
+        } else if (ghost.x > ninjaman.x && world[ghost.y][ghost.x - 1] != 1) {
+            ghost.x--;
+        }
+
+        randomChanceOfDoingNothing = Math.random() * 100
+        if (randomChanceOfDoingNothing <= 33) {
+            drawGhosts();
+            return
+        }
+
+        if (ghost2.x < ninjaman.x && world[ghost2.y][ghost2.x + 1] != 1) {
+            ghost2.x++;
+        } else if (ghost2.x > ninjaman.x && world[ghost2.y][ghost2.x - 1] != 1) {
+            ghost2.x--;
+        } else if (ghost2.y < ninjaman.y && world[ghost2.y + 1][ghost2.x] != 1) {
+            ghost2.y++;
+        } else if (ghost2.y > ninjaman.y && world[ghost2.y - 1][ghost2.x] != 1) {
+            ghost2.y--;
+        }
+    }
+
+    function ifGhostCatchNinjaLoseLife() {
+        if (ghost.x == ninjaman.x && ghost.y == ninjaman.y) {
+            if (lives > 0) {
+                lives--;
+            }
+
+            do {
+                ghost.x = Math.floor(Math.random() * 100 % dimensions)
+                ghost.y = Math.floor(Math.random() * 100 % dimensions)
+            } while (world[ghost.y][ghost.x] == 1)
+        }
+
+        if (ghost2.x == ninjaman.x && ghost2.y == ninjaman.y) {
+            if (lives > 0) {
+                lives--;
+            }
+
+            do {
+                ghost2.x = Math.floor(Math.random() * 100 % dimensions)
+                ghost2.y = Math.floor(Math.random() * 100 % dimensions)
+            } while (world[ghost2.y][ghost2.x] == 1)
+        
+        }
+
+        drawGhosts();
+        return
+    }
+
+    function displayGameOverStatement() {
+        if (score == winningScore) {
+            document.querySelector('#game-over').innerHTML = "<div class='gameover' style='width: "+dimensions*40+"px'>- YOU WIN! -</div>" + 
+            "<div class='gameover-refresh' style='width: "+dimensions*40+"px'>Play Again? Press: SPACE or ENTER</div>";
+        } else {
+            document.querySelector('#game-over').innerHTML = "<div class='gameover' style='width: "+dimensions*40+"px'>- GAME OVER -</div>" + 
+            "<div class='gameover-refresh' style='width: "+dimensions*40+"px'>Play Again? Press: SPACE or ENTER</div>";
+        }
+        return
+    }
+
+    document.onkeydown = function(e) {
+
+        if (e.keyCode == 37) {
+            if (world[ninjaman.y][ninjaman.x - 1] != 1 && ninjaman.x - 1 != -1) {
+                ninjaman.x--;
+            }
+            
+        }
+        if (e.keyCode == 39) {
+            if (world[ninjaman.y][ninjaman.x + 1] != 1 && ninjaman.x + 1 != dimensions) {
+                ninjaman.x++;
+            }
+        }
+        if (e.keyCode == 40 && ninjaman.y != dimensions - 1) {
+            if (world[ninjaman.y + 1][ninjaman.x] != 1) {
+                ninjaman.y++;
+            }
+        }
+        if (e.keyCode == 38 && ninjaman.y != 0) {
+            if (world[ninjaman.y - 1][ninjaman.x] != 1) {
+                ninjaman.y--;
+            }
+        }
+
+        if (world[ninjaman.y][ninjaman.x] == 2) {
+            score += 10;
+        }
+        
+        if (world[ninjaman.y][ninjaman.x] == 3) {
+            score += 5;
+        }
+
+        if (e.keyCode >= 37 && e.keyCode <= 40 && score < winningScore && lives > 0) {
+            ghostChaseNinjaman();
+            drawNinjaman();
+            drawGhosts();
+            ifGhostCatchNinjaLoseLife();
+            drawWorld();
+            world[ninjaman.y][ninjaman.x] = 0;
+        }
+
+        if ((score == winningScore | lives == 0) && game == true) {
+            game = false;
+            drawWorld();
+            drawNinjaman();
+            world[ninjaman.y][ninjaman.x] = 0;
+            displayGameOverStatement();
+        }
+    }
+
+    document.addEventListener('keyup', function(e) {
+        if(e.keyCode == 32 | e.keyCode == 13 && game == false) {
+            window.location.reload();
+        }
+    })
+
+</script>
+</html>
